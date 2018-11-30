@@ -1,5 +1,9 @@
 #include "DHTesp.h"
 #include "Ticker.h"
+#include <BLEDevice.h>
+#include <BLEServer.h>
+#include <BLEUtils.h>
+#include <BLE2902.h>
 
 #ifndef ESP32
 #pragma message(THIS EXAMPLE IS FOR ESP32 ONLY!)
@@ -31,7 +35,15 @@ ComfortState cf;
 /** Flag if task should run */
 bool tasksEnabled = false;
 /** Pin number for DHT11 data pin */
-int dhtPin = 17;
+int dhtPin = 16;
+
+// Bluetooth variables
+BLEServer* pServer = NULL;
+BLECharacteristic* pCharactDHT22 = NULL;
+bool deviceConnected = false;
+bool oldDeviceConnected = false;
+#define SERVICE_UUID        "c8d1d262-861f-5082-947e-f383a259aadd"
+#define CHARAC_DHT_UUID    "b0f332a8-a5aa-4f3a-bb43-f99e8811ae01"
 
 /**
  * initTemp
@@ -151,8 +163,73 @@ bool getTemperature() {
       break;
   };
 
-  Serial.println(" T:" + String(newValues.temperature) + " H:" + String(newValues.humidity) + " I:" + String(heatIndex) + " D:" + String(dewPoint) + " " + comfortStatus);
+  Serial.println(
+    " T:" + String(newValues.temperature) + 
+    " H:" + String(newValues.humidity) + 
+    " I:" + String(heatIndex) + 
+    " D:" + String(dewPoint) + 
+    " " + comfortStatus
+  );
+
+  // notify changed value
+  String output = String("{")+"\"T\":"+String(newValues.temperature)+"}";
+  pCharactDHT22->setValue(output.c_str());
+  pCharactDHT22->notify();
+
 	return true;
+}
+
+/******************************************************************************
+*   B L U E T O O T H  M E T H O D S
+******************************************************************************/
+class MyServerCallbacks: public BLEServerCallbacks {
+	void onConnect(BLEServer* pServer) {
+      Serial.println("-->[BLE] onConnect");
+      deviceConnected = true;
+    };
+
+    void onDisconnect(BLEServer* pServer) {
+      Serial.println("-->[BLE] onDisconnect");
+      deviceConnected = false;
+    };
+}; // BLEServerCallbacks
+
+void bleServerInit(){
+  // Create the BLE Device
+  BLEDevice::init("ESP32_DTH22");
+  // Create the BLE Server
+  pServer = BLEDevice::createServer();
+  pServer->setCallbacks(new MyServerCallbacks());
+  // Create the BLE Service
+  BLEService *pService = pServer->createService(SERVICE_UUID);
+  // Create a BLE Characteristic for PM 2.5
+  pCharactDHT22 = pService->createCharacteristic(
+                      CHARAC_DHT_UUID,
+                      BLECharacteristic::PROPERTY_READ   |
+                      BLECharacteristic::PROPERTY_NOTIFY
+                    );
+  // Create a BLE Descriptor
+  pCharactDHT22->addDescriptor(new BLE2902());
+  // Start the service
+  pService->start();
+  // Start advertising
+  pServer->getAdvertising()->start();
+  Serial.println("-->[BLE] GATT server ready. (Waiting a client to notify)");
+}
+
+void bleLoop(){
+  // disconnecting
+  if (!deviceConnected && oldDeviceConnected) {
+    delay(500); // give the bluetooth stack the chance to get things ready
+    pServer->startAdvertising(); // restart advertising
+    Serial.println("-->[BLE] start advertising");
+    oldDeviceConnected = deviceConnected;
+  }
+  // connecting
+  if (deviceConnected && !oldDeviceConnected) {
+    // do stuff here on connecting
+    oldDeviceConnected = deviceConnected;
+  }
 }
 
 void setup()
@@ -161,6 +238,7 @@ void setup()
   Serial.println();
   Serial.println("DHT ESP32 example with tasks");
   initTemp();
+  bleServerInit();
   // Signal end of setup() to tasks
   tasksEnabled = true;
 }
@@ -174,6 +252,7 @@ void loop() {
     if (tempTaskHandle != NULL) {
 			vTaskResume(tempTaskHandle);
 		}
+    bleLoop();
   }
   yield();
 }
