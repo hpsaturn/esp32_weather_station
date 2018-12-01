@@ -172,11 +172,14 @@ bool getTemperature() {
   );
 
   // notify changed value
-  String output = String("{")+"\"T\":"+String(newValues.temperature)+"}";
-  pCharactDHT22->setValue(output.c_str());
-  pCharactDHT22->notify();
+  if (deviceConnected) {
+    String output = String("{") + "\"T\":" + String(newValues.temperature) + ",";
+    output = output+"\"H\":" + String(newValues.humidity) + "}";
+    pCharactDHT22->setValue(output.c_str());
+    pCharactDHT22->notify();
+  }
 
-	return true;
+  return true;
 }
 
 /******************************************************************************
