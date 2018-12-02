@@ -108,6 +108,11 @@ void tempTask(void *pvParameters) {
 	}
 }
 
+float rndup(float n) { //round up a float type and show one decimal place
+  int out = (int) ceil(n*10.0);
+  return out/10.0;
+}
+
 /**
  * getTemperature
  * Reads temperature from DHT11 sensor
@@ -173,8 +178,10 @@ bool getTemperature() {
 
   // notify changed value
   if (deviceConnected) {
-    String output = String("{") + "\"T\":" + String(newValues.temperature) + ",";
-    output = output+"\"H\":" + String(newValues.humidity) + "}";
+    String output = String("") + String(rndup(newValues.temperature)) + ";";
+    output = output + String(rndup(newValues.humidity)) + ";";
+    output = output + String(rndup(dewPoint)) + ";";
+    output = output + String(rndup(heatIndex));
     pCharactDHT22->setValue(output.c_str());
     pCharactDHT22->notify();
   }
