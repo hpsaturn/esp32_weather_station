@@ -4,6 +4,7 @@
 #include <BLEServer.h>
 #include <BLEUtils.h>
 #include <BLE2902.h>
+#include "esp_sleep.h"
 
 #ifndef ESP32
 #pragma message(THIS EXAMPLE IS FOR ESP32 ONLY!)
@@ -33,7 +34,7 @@ Ticker tempTicker;
 /** Comfort profile */
 ComfortState cf;
 /** Flag if task should run */
-bool tasksEnabled = false;
+bool tasksEnabled = true;
 /** Pin number for DHT11 data pin */
 int dhtPin = 16;
 
@@ -45,6 +46,8 @@ bool oldDeviceConnected = false;
 #define SERVICE_UUID        "c8d1d262-861f-5082-947e-f383a259aadd"
 #define CHARAC_DHT_UUID    "b0f332a8-a5aa-4f3a-bb43-f99e8811ae01"
 
+#define GPIO_DEEP_SLEEP_DURATION 10 // sleep x seconds and then wake up
+
 /**
  * initTemp
  * Setup DHT library
@@ -54,7 +57,6 @@ bool oldDeviceConnected = false;
  *    false if task or timer couldn't be started
  */
 bool initTemp() {
-  byte resultValue = 0;
   // Initialize temperature sensor
 	dht.setup(dhtPin, DHTesp::DHT22);
 	Serial.println("DHT initiated");
@@ -73,7 +75,7 @@ bool initTemp() {
     Serial.println("Failed to start task for temperature update");
     return false;
   } else {
-    // Start update of environment data every 20 seconds
+    // Start update of environment data every 5 seconds
     tempTicker.attach(5, triggerGetTemp);
   }
   return true;
@@ -132,7 +134,7 @@ bool getTemperature() {
 
 	float heatIndex = dht.computeHeatIndex(newValues.temperature, newValues.humidity);
   float dewPoint = dht.computeDewPoint(newValues.temperature, newValues.humidity);
-  float cr = dht.getComfortRatio(cf, newValues.temperature, newValues.humidity);
+  dht.getComfortRatio(cf, newValues.temperature, newValues.humidity);
 
   String comfortStatus;
   switch(cf) {
@@ -188,6 +190,30 @@ bool getTemperature() {
 
   return true;
 }
+/*
+void taskLoop(){
+  if (!tasksEnabled)
+  {
+    // Wait 2 seconds to let system settle down
+    delay(2000);
+    // Enable task that will read values from the DHT sensor
+    tasksEnabled = true;
+    if (tempTaskHandle != NULL)
+    {
+      vTaskResume(tempTaskHandle);
+    }
+  }
+}
+*/
+
+void gotToSuspend (){
+  Serial.println("-->stop advertising..");
+  pServer->getAdvertising()->stop();
+  Serial.println("-->enter deep sleep..");
+  delay(10);
+  esp_deep_sleep(1000000LL * GPIO_DEEP_SLEEP_DURATION);
+  Serial.println("-->in deep sleep\n");
+}
 
 /******************************************************************************
 *   B L U E T O O T H  M E T H O D S
@@ -234,35 +260,33 @@ void bleLoop(){
     pServer->startAdvertising(); // restart advertising
     Serial.println("-->[BLE] start advertising");
     oldDeviceConnected = deviceConnected;
+    gotToSuspend();
+    // Signal end of setup() to tasks
   }
   // connecting
-  if (deviceConnected && !oldDeviceConnected) {
+  if (deviceConnected && !oldDeviceConnected)
+  {
     // do stuff here on connecting
     oldDeviceConnected = deviceConnected;
+    // Signal end of setup() to tasks
+    initTemp();
   }
 }
 
-void setup()
-{
+void setup() {
   Serial.begin(115200);
   Serial.println();
   Serial.println("DHT ESP32 example with tasks");
-  initTemp();
   bleServerInit();
-  // Signal end of setup() to tasks
-  tasksEnabled = true;
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite (LED_BUILTIN, HIGH);
+  delay(3000);
+  if(!deviceConnected){
+    initTemp();
+    gotToSuspend();
+  }
 }
 
 void loop() {
-  if (!tasksEnabled) {
-    // Wait 2 seconds to let system settle down
-    delay(2000);
-    // Enable task that will read values from the DHT sensor
-    tasksEnabled = true;
-    if (tempTaskHandle != NULL) {
-			vTaskResume(tempTaskHandle);
-		}
-    bleLoop();
-  }
-  yield();
+  bleLoop();
 }
