@@ -1,3 +1,18 @@
+/********************************************************************
+ * Weather Station with DHT22 and ESP32
+ * 
+ * @author Antonio Vanegas @hpsaturn
+ * @date December 2018
+ * @brief DHT22 sensor with a ESP32 with bluetooth BLE GATT server
+ * @license GPL3
+ * 
+ * @url https://github.com/hpsaturn/esp32_weather_station
+ *
+ * rev000 20181128 initial values from DHTesp sample via serial
+ * rev001 20181201 basic GATT server with temperature and humidity
+ * rev002 20181202 suspend function for setup cycle
+ ********************************************************************/
+
 #include "DHTesp.h"
 #include "Ticker.h"
 #include <BLEDevice.h>
@@ -7,19 +22,9 @@
 #include "esp_sleep.h"
 
 #ifndef ESP32
-#pragma message(THIS EXAMPLE IS FOR ESP32 ONLY!)
+#pragma message(THIS CODE IS FOR ESP32 ONLY!)
 #error Select ESP32 board.
 #endif
-
-/**************************************************************/
-/* Example how to read DHT sensors from an ESP32 using multi- */
-/* tasking.                                                   */
-/* This example depends on the ESP32Ticker library to wake up */
-/* the task every 20 seconds                                  */
-/* Please install Ticker-esp32 library first                  */
-/* bertmelis/Ticker-esp32                                     */
-/* https://github.com/bertmelis/Ticker-esp32                  */
-/**************************************************************/
 
 DHTesp dht;
 
@@ -35,7 +40,7 @@ Ticker tempTicker;
 ComfortState cf;
 /** Flag if task should run */
 bool tasksEnabled = true;
-/** Pin number for DHT11 data pin */
+/** Pin number for DHT22 data pin */
 int dhtPin = 16;
 
 // Bluetooth variables
@@ -46,7 +51,8 @@ bool oldDeviceConnected = false;
 #define SERVICE_UUID        "c8d1d262-861f-5082-947e-f383a259aadd"
 #define CHARAC_DHT_UUID    "b0f332a8-a5aa-4f3a-bb43-f99e8811ae01"
 
-#define GPIO_DEEP_SLEEP_DURATION 10 // sleep x seconds and then wake up
+// ESP32 Deep Sleep time
+#define GPIO_DEEP_SLEEP_DURATION 15 // sleep x seconds and then wake up
 
 /**
  * initTemp
@@ -60,7 +66,6 @@ bool initTemp() {
   // Initialize temperature sensor
 	dht.setup(dhtPin, DHTesp::DHT22);
 	Serial.println("-->[DHT] initiated");
-
   // Start task to get temperature
 	xTaskCreatePinnedToCore(
 			tempTask,                       /* Function to implement the task */
@@ -93,7 +98,7 @@ void triggerGetTemp() {
 }
 
 /**
- * Task to reads temperature from DHT11 sensor
+ * Task to reads temperature from DHT22 sensor
  * @param pvParameters
  *    pointer to task parameters
  */
@@ -110,14 +115,9 @@ void tempTask(void *pvParameters) {
 	}
 }
 
-float rndup(float n) { //round up a float type and show one decimal place
-  int out = (int) ceil(n*10.0);
-  return out/10.0;
-}
-
 /**
  * getTemperature
- * Reads temperature from DHT11 sensor
+ * Reads temperature from DHT22 sensor
  * @return bool
  *    true if temperature could be aquired
  *    false if aquisition failed
@@ -180,31 +180,16 @@ bool getTemperature() {
 
   // notify changed value
   if (deviceConnected) {
-    String output = String("") + String(rndup(newValues.temperature)) + ";";
-    output = output + String(rndup(newValues.humidity)) + ";";
-    output = output + String(rndup(dewPoint)) + ";";
-    output = output + String(rndup(heatIndex));
+    String output = String("") + String(newValues.temperature) + ";";
+    output = output + String(newValues.humidity) + ";";
+    output = output + String(dewPoint) + ";";
+    output = output + String(heatIndex);
     pCharactDHT22->setValue(output.c_str());
     pCharactDHT22->notify();
   }
 
   return true;
 }
-/*
-void taskLoop(){
-  if (!tasksEnabled)
-  {
-    // Wait 2 seconds to let system settle down
-    delay(2000);
-    // Enable task that will read values from the DHT sensor
-    tasksEnabled = true;
-    if (tempTaskHandle != NULL)
-    {
-      vTaskResume(tempTaskHandle);
-    }
-  }
-}
-*/
 
 void gotToSuspend (){
   Serial.println("-->[BLE] stop advertising");
@@ -259,8 +244,8 @@ void bleLoop(){
     pServer->startAdvertising(); // restart advertising
     Serial.println("-->[BLE] start advertising");
     oldDeviceConnected = deviceConnected;
+    // not devices, go to suspend cycle
     gotToSuspend();
-    // Signal end of setup() to tasks
   }
   // connecting
   if (deviceConnected && !oldDeviceConnected)
@@ -281,7 +266,7 @@ void setup() {
   digitalWrite (LED_BUILTIN, HIGH);
   delay(3000);
   if(!deviceConnected){
-    initTemp();
+    initTemp();  // only for get one sensor data via serial
     gotToSuspend();
   }
 }
