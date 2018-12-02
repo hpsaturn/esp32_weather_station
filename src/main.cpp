@@ -59,7 +59,7 @@ bool oldDeviceConnected = false;
 bool initTemp() {
   // Initialize temperature sensor
 	dht.setup(dhtPin, DHTesp::DHT22);
-	Serial.println("DHT initiated");
+	Serial.println("-->[DHT] initiated");
 
   // Start task to get temperature
 	xTaskCreatePinnedToCore(
@@ -72,7 +72,7 @@ bool initTemp() {
 			1);                             /* Core where the task should run */
 
   if (tempTaskHandle == NULL) {
-    Serial.println("Failed to start task for temperature update");
+    Serial.println("--->[E] Failed to start task for temperature update");
     return false;
   } else {
     // Start update of environment data every 5 seconds
@@ -98,7 +98,7 @@ void triggerGetTemp() {
  *    pointer to task parameters
  */
 void tempTask(void *pvParameters) {
-	Serial.println("tempTask loop started");
+	Serial.println("-->[DHT] temp task loop started");
 	while (1) // tempTask loop
   {
     if (tasksEnabled) {
@@ -128,7 +128,7 @@ bool getTemperature() {
   TempAndHumidity newValues = dht.getTempAndHumidity();
 	// Check if any reads failed and exit early (to try again).
 	if (dht.getStatus() != 0) {
-		Serial.println("DHT11 error status: " + String(dht.getStatusString()));
+		Serial.println("--->[E] DHT22 error status: " + String(dht.getStatusString()));
 		return false;
 	}
 
@@ -171,7 +171,7 @@ bool getTemperature() {
   };
 
   Serial.println(
-    " T:" + String(newValues.temperature) + 
+    "-->[DHT] T:" + String(newValues.temperature) + 
     " H:" + String(newValues.humidity) + 
     " I:" + String(heatIndex) + 
     " D:" + String(dewPoint) + 
@@ -207,12 +207,11 @@ void taskLoop(){
 */
 
 void gotToSuspend (){
-  Serial.println("-->stop advertising..");
+  Serial.println("-->[BLE] stop advertising");
   pServer->getAdvertising()->stop();
-  Serial.println("-->enter deep sleep..");
+  Serial.println("-->[ESP] enter deep sleep..");
   delay(10);
   esp_deep_sleep(1000000LL * GPIO_DEEP_SLEEP_DURATION);
-  Serial.println("-->in deep sleep\n");
 }
 
 /******************************************************************************
@@ -276,7 +275,7 @@ void bleLoop(){
 void setup() {
   Serial.begin(115200);
   Serial.println();
-  Serial.println("DHT ESP32 example with tasks");
+  Serial.println("==>[DHT22 ESP32]<==");
   bleServerInit();
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite (LED_BUILTIN, HIGH);
