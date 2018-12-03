@@ -52,7 +52,8 @@ bool oldDeviceConnected = false;
 #define CHARAC_DHT_UUID    "b0f332a8-a5aa-4f3a-bb43-f99e8811ae01"
 
 // ESP32 Deep Sleep time
-#define GPIO_DEEP_SLEEP_DURATION 15 // sleep x seconds and then wake up
+#define GPIO_DEEP_SLEEP_DURATION 10 // sleep x seconds and then wake up
+#define GPIO_LED_GREEN 22 // Led on TTGO board (black) 
 
 /**
  * initTemp
@@ -199,6 +200,13 @@ void gotToSuspend (){
   esp_deep_sleep(1000000LL * GPIO_DEEP_SLEEP_DURATION);
 }
 
+void blinkOnboardLed () {  // for show receive connections state
+  pinMode(GPIO_LED_GREEN, OUTPUT);
+  digitalWrite (GPIO_LED_GREEN, LOW);
+  delay(250);
+  digitalWrite (GPIO_LED_GREEN, HIGH);
+}
+
 /******************************************************************************
 *   B L U E T O O T H  M E T H O D S
 ******************************************************************************/
@@ -261,10 +269,11 @@ void setup() {
   Serial.begin(115200);
   Serial.println();
   Serial.println("==>[DHT22 ESP32]<==");
-  bleServerInit();
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite (LED_BUILTIN, HIGH);
+  // waiting for connections
+  blinkOnboardLed();
+  bleServerInit(); 
   delay(3000);
+  // if any device, print sensor data via serial and go to suspend mode;  
   if(!deviceConnected){
     initTemp();  // only for get one sensor data via serial
     gotToSuspend();
