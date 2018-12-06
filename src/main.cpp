@@ -53,9 +53,20 @@ bool oldDeviceConnected = false;
 #define CHARAC_DHT_UUID    "b0f332a8-a5aa-4f3a-bb43-f99e8811ae01"
 
 // ESP32 Deep Sleep time
-#define DEEP_SLEEP_DURATION 10 // sleep x seconds and then wake up
+#define DEEP_SLEEP_DURATION 15 // sleep x seconds and then wake up
 #define GPIO_LED_GREEN 22 // Led on TTGO board (black) 
 #define GPIO_SENSOR_ENABLE 17
+
+/**
+ * blinkOnboardLed
+ * notify each data send package
+ */
+
+void blinkOnboardLed () { 
+  digitalWrite (GPIO_LED_GREEN, LOW);
+  delay(50);
+  digitalWrite (GPIO_LED_GREEN, HIGH);
+}
 
 /**
  * initTemp
@@ -83,8 +94,8 @@ bool initTemp() {
     Serial.println("--->[E] Failed to start task for temperature update");
     return false;
   } else {
-    // Start update of environment data every 5 seconds
-    tempTicker.attach(5, triggerGetTemp);
+    // Start update of environment data every 10 seconds
+    tempTicker.attach(10, triggerGetTemp);
   }
   return true;
 }
@@ -191,17 +202,19 @@ bool getTemperature() {
     pCharactDHT22->notify();
   }
 
+  blinkOnboardLed(); // notify via LED
+
   return true;
 }
 
 void enableSensor () {  // for show receive connections state
   digitalWrite (GPIO_SENSOR_ENABLE, HIGH);
-  delay(10);
+  delay(1);
 }
 
 void disableSensor () {  // for show receive connections state
   digitalWrite (GPIO_SENSOR_ENABLE, HIGH);
-  delay(10);
+  delay(1);
 }
 
 void gotToSuspend (){
@@ -209,15 +222,8 @@ void gotToSuspend (){
   pServer->getAdvertising()->stop();
   Serial.println("-->[ESP] enter deep sleep..");
   disableSensor();
-  delay(10);
+  delay(5);
   esp_deep_sleep(1000000LL * DEEP_SLEEP_DURATION);
-}
-
-void blinkOnboardLed () {  // for show receive connections state
-  pinMode(GPIO_LED_GREEN, OUTPUT);
-  digitalWrite (GPIO_LED_GREEN, LOW);
-  delay(250);
-  digitalWrite (GPIO_LED_GREEN, HIGH);
 }
 
 /******************************************************************************
@@ -254,6 +260,7 @@ void bleServerInit(){
   // Start the service
   pService->start();
   // Start advertising
+  Serial.println("-->[BLE] start advertising");
   pServer->getAdvertising()->start();
   Serial.println("-->[BLE] GATT server ready. (Waiting a client to notify)");
 }
@@ -261,9 +268,6 @@ void bleServerInit(){
 void bleLoop(){
   // disconnecting
   if (!deviceConnected && oldDeviceConnected) {
-    delay(500); // give the bluetooth stack the chance to get things ready
-    pServer->startAdvertising(); // restart advertising
-    Serial.println("-->[BLE] start advertising");
     oldDeviceConnected = deviceConnected;
     // not devices, go to suspend cycle
     gotToSuspend();
@@ -282,12 +286,16 @@ void setup() {
   Serial.begin(115200);
   Serial.println();
   Serial.println("==>[DHT22 ESP32]<==");
-  // waiting for connections
+  // GPIO setup
+  pinMode(GPIO_LED_GREEN, OUTPUT);
+  digitalWrite (GPIO_LED_GREEN, HIGH);
   pinMode(GPIO_SENSOR_ENABLE, OUTPUT);
   enableSensor();
-  blinkOnboardLed();
+
+  // waiting for connections
   bleServerInit(); 
-  delay(3000);
+  delay(1000);
+
   // if any device, print sensor data via serial and go to suspend mode;  
   if(!deviceConnected){
     initTemp();  // only for get one sensor data via serial
