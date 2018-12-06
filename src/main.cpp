@@ -53,9 +53,10 @@ bool oldDeviceConnected = false;
 #define CHARAC_DHT_UUID    "b0f332a8-a5aa-4f3a-bb43-f99e8811ae01"
 
 // ESP32 Deep Sleep time
-#define GPIO_DEEP_SLEEP_DURATION 10 // sleep x seconds and then wake up
+#define DEEP_SLEEP_DURATION 10 // sleep x seconds and then wake up
 #define GPIO_LED_GREEN 22 // Led on TTGO board (black) 
 #define GPIO_SENSOR_ENABLE 17
+
 /**
  * initTemp
  * Setup DHT library
@@ -193,14 +194,6 @@ bool getTemperature() {
   return true;
 }
 
-void gotToSuspend (){
-  Serial.println("-->[BLE] stop advertising");
-  pServer->getAdvertising()->stop();
-  Serial.println("-->[ESP] enter deep sleep..");
-  delay(10);
-  esp_deep_sleep(1000000LL * GPIO_DEEP_SLEEP_DURATION);
-}
-
 void enableSensor () {  // for show receive connections state
   digitalWrite (GPIO_SENSOR_ENABLE, HIGH);
   delay(10);
@@ -209,6 +202,15 @@ void enableSensor () {  // for show receive connections state
 void disableSensor () {  // for show receive connections state
   digitalWrite (GPIO_SENSOR_ENABLE, HIGH);
   delay(10);
+}
+
+void gotToSuspend (){
+  Serial.println("-->[BLE] stop advertising");
+  pServer->getAdvertising()->stop();
+  Serial.println("-->[ESP] enter deep sleep..");
+  disableSensor();
+  delay(10);
+  esp_deep_sleep(1000000LL * DEEP_SLEEP_DURATION);
 }
 
 void blinkOnboardLed () {  // for show receive connections state
@@ -290,7 +292,6 @@ void setup() {
   if(!deviceConnected){
     initTemp();  // only for get one sensor data via serial
     gotToSuspend();
-    disableSensor();
   }
 }
 
