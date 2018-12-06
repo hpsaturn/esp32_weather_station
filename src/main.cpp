@@ -11,6 +11,7 @@
  * rev000 20181128 initial values from DHTesp sample via serial
  * rev001 20181201 basic GATT server with temperature and humidity
  * rev002 20181202 suspend function for setup cycle
+ * rev003 20181203 added blink led on BLE waiting connection state
  ********************************************************************/
 
 #include "DHTesp.h"
@@ -54,7 +55,7 @@ bool oldDeviceConnected = false;
 // ESP32 Deep Sleep time
 #define GPIO_DEEP_SLEEP_DURATION 10 // sleep x seconds and then wake up
 #define GPIO_LED_GREEN 22 // Led on TTGO board (black) 
-
+#define GPIO_SENSOR_ENABLE 17
 /**
  * initTemp
  * Setup DHT library
@@ -200,6 +201,16 @@ void gotToSuspend (){
   esp_deep_sleep(1000000LL * GPIO_DEEP_SLEEP_DURATION);
 }
 
+void enableSensor () {  // for show receive connections state
+  digitalWrite (GPIO_SENSOR_ENABLE, HIGH);
+  delay(10);
+}
+
+void disableSensor () {  // for show receive connections state
+  digitalWrite (GPIO_SENSOR_ENABLE, HIGH);
+  delay(10);
+}
+
 void blinkOnboardLed () {  // for show receive connections state
   pinMode(GPIO_LED_GREEN, OUTPUT);
   digitalWrite (GPIO_LED_GREEN, LOW);
@@ -270,6 +281,8 @@ void setup() {
   Serial.println();
   Serial.println("==>[DHT22 ESP32]<==");
   // waiting for connections
+  pinMode(GPIO_SENSOR_ENABLE, OUTPUT);
+  enableSensor();
   blinkOnboardLed();
   bleServerInit(); 
   delay(3000);
@@ -277,6 +290,7 @@ void setup() {
   if(!deviceConnected){
     initTemp();  // only for get one sensor data via serial
     gotToSuspend();
+    disableSensor();
   }
 }
 
