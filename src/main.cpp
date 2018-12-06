@@ -64,7 +64,7 @@ bool oldDeviceConnected = false;
 
 void blinkOnboardLed () { 
   digitalWrite (GPIO_LED_GREEN, LOW);
-  delay(50);
+  delay(50); // fast blink for low power
   digitalWrite (GPIO_LED_GREEN, HIGH);
 }
 
@@ -209,20 +209,17 @@ bool getTemperature() {
 
 void enableSensor () {  // for show receive connections state
   digitalWrite (GPIO_SENSOR_ENABLE, HIGH);
-  delay(1);
 }
 
 void disableSensor () {  // for show receive connections state
   digitalWrite (GPIO_SENSOR_ENABLE, HIGH);
-  delay(1);
 }
 
 void gotToSuspend (){
-  Serial.println("-->[BLE] stop advertising");
+  Serial.println("-->[ESP] suspending..");
   pServer->getAdvertising()->stop();
-  Serial.println("-->[ESP] enter deep sleep..");
   disableSensor();
-  delay(5);
+  delay(8); // waiting for writing msg on serial
   esp_deep_sleep(1000000LL * DEEP_SLEEP_DURATION);
 }
 
@@ -275,9 +272,9 @@ void bleLoop(){
   // connecting
   if (deviceConnected && !oldDeviceConnected)
   {
-    // do stuff here on connecting
     oldDeviceConnected = deviceConnected;
-    // Signal end of setup() to tasks
+    enableSensor();
+    delay(1000);  // waiting for initial capture data
     initTemp();
   }
 }
@@ -290,15 +287,13 @@ void setup() {
   pinMode(GPIO_LED_GREEN, OUTPUT);
   digitalWrite (GPIO_LED_GREEN, HIGH);
   pinMode(GPIO_SENSOR_ENABLE, OUTPUT);
-  enableSensor();
 
-  // waiting for connections
+  // waiting 1s for connections
   bleServerInit(); 
   delay(1000);
 
   // if any device, print sensor data via serial and go to suspend mode;  
   if(!deviceConnected){
-    initTemp();  // only for get one sensor data via serial
     gotToSuspend();
   }
 }
