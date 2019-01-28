@@ -220,7 +220,9 @@ void gotToSuspend (){
   pServer->getAdvertising()->stop();
   disableSensor();
   delay(8); // waiting for writing msg on serial
-  esp_deep_sleep(1000000LL * DEEP_SLEEP_DURATION);
+  //esp_deep_sleep(1000000LL * DEEP_SLEEP_DURATION);
+  esp_sleep_enable_timer_wakeup(1000000LL * DEEP_SLEEP_DURATION);
+  esp_deep_sleep_start();
 }
 
 /******************************************************************************
